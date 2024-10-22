@@ -1,24 +1,10 @@
-![Install Dependencies](https://github.com/haobo-yuan/IDS706-5-SQL-Python/actions/workflows/install.yml/badge.svg)
-![Format Code](https://github.com/haobo-yuan/IDS706-5-SQL-Python/actions/workflows/format.yml/badge.svg)
-![Lint Code](https://github.com/haobo-yuan/IDS706-5-SQL-Python/actions/workflows/lint.yml/badge.svg)
-![Run Tests](https://github.com/haobo-yuan/IDS706-5-SQL-Python/actions/workflows/test.yml/badge.svg)
+![Install Dependencies](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/install.yml/badge.svg)
+![Format Code](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/format.yml/badge.svg)
+![Lint Code](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/lint.yml/badge.svg)
+![Run Tests](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/test.yml/badge.svg)
 
-# IDS-706 Data Engineering: Project 5
-This is a IDS-706 week 5 project that tries to explore Python Script interacting with SQL Database.
-
-## Screenshot of successful database operations
-
-1. Working in Jupyter Notebook, exploring the data in the database, and implementing CRUD operations.
-
-![Screenshot_Notebook](pictures/Succeed_in_implementing_CRUD_in_Jupyter_Notebooks.png)
-
-2. Then seperate the code into different files, including `lib.py`, `main.py`, `test_lib.py` and `test_main.py`, and run them in the terminal.
-
-![Screenshot_main](pictures/Succeed_in_main.png)
-
-![Screenshot_test_lib](pictures/Succeed_in_test_lib.png)
-
-![Screenshot_test_main](pictures/Succeed_in_test_main.png)
+# IDS-706 Data Engineering: Project 8
+This is a IDS-706 week 8 project that tries to take an existing Python script (which interactes with SQL Database) for data processing and rewrite it in Rust.
 
 ## AAPL Price Statistics (2010-2021)
 
