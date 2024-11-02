@@ -1,0 +1,8 @@
+[package]
+name = "rust_stock_analysis"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+polars = { version = "0.44.2", features = ["lazy"] }
+plotters = "0.3.1"

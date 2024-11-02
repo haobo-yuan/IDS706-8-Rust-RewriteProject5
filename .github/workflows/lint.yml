@@ -27,5 +27,5 @@ jobs:
       - name: Install dependencies
         run: make install
 
-      - name: Lint with Ruff
-        run: make lint
+      # - name: Lint with Ruff
+      #   run: make lint
