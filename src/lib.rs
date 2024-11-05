@@ -1,129 +1,86 @@
-use polars_core::prelude::*;
-use polars_io::prelude::*;
-
-use std::fs::File;
+use rusqlite::{Connection, Result};
+use csv::ReaderBuilder;
+use serde::Deserialize;
 use std::error::Error;
 
-use plotters::prelude::*;
-// ChatGPT and Co-Pilot are used for reference
-
-
-/// Function to preprocess data
-pub fn preprocess_data() -> PolarsResult<DataFrame> {
-    // Read the data from the CSV file with tab separator, https://docs.rs/polars/latest/polars/prelude/struct.CsvReader.html
-    let mut df = CsvReader::CsvReadOptions::default()
-            .with_has_header(true)
-            .try_into_reader_with_file_path(Some("data/NASDAQ_100_Data_From_2010.csv".into()))?
-            .with_delimiter(b'\t')
-            .finish();
-
-    // Filter for AAPL stock data
-    df = df.filter(&df.column("Name")?.equal("AAPL")?)?;
-
-    // Convert 'Date' column to Date type
-    let date_series = df
-        .column("Date")?
-        .utf8()?
-        .as_date(Some("%Y-%m-%d"))?
-        .into_series()
-        .rename("Date");
-
-    // Replace 'Date' column with the converted date_series
-    df.replace("Date", date_series)?;
-
-    // Extract 'Year' from 'Date' and add as a new column
-    let year_series = df
-        .column("Date")?
-        .date()?
-        .year()
-        .into_series()
-        .rename("Year");
-
-    df.with_column(year_series)?;
-
-    Ok(df)
+// 定义 `StockRecord` 并派生 `Deserialize`
+#[derive(Debug, Deserialize)]
+pub struct StockRecord {
+    date: String,
+    open: f64,
+    high: f64,
+    low: f64,
+    close: f64,
+    adj_close: f64,
+    volume: i64,
+    name: String,
+    year: i32,
 }
 
-/// Function to generate plot
-pub fn generate_plot(yearly_stats: &DataFrame) -> Result<(), Box<dyn Error>> {
-    // Create a drawing area
-    let root = BitMapBackend::new("pictures/plot.png", (1024, 768)).into_drawing_area();
-    root.fill(&WHITE)?;
+// 创建数据库连接并初始化表
+pub fn init_db(db_path: &str) -> Result<Connection> {
+    let conn = Connection::open(db_path)?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS stock_data (
+            date TEXT,
+            open REAL,
+            high REAL,
+            low REAL,
+            close REAL,
+            adj_close REAL,
+            volume INTEGER,
+            name TEXT,
+            year INTEGER
+        )",
+        [],
+    )?;
+    Ok(conn)
+}
 
-    // Extract data from DataFrame
-    let years = yearly_stats
-        .column("Year")?
-        .i32()?
-        .into_no_null_iter()
-        .collect::<Vec<_>>();
-
-    let means = yearly_stats
-        .column("mean")?
-        .f64()?
-        .into_no_null_iter()
-        .collect::<Vec<_>>();
-
-    let medians = yearly_stats
-        .column("median")?
-        .f64()?
-        .into_no_null_iter()
-        .collect::<Vec<_>>();
-
-    let stds = yearly_stats
-        .column("std")?
-        .f64()?
-        .into_no_null_iter()
-        .collect::<Vec<_>>();
-
-    // Determine min and max values for axes
-    let min_year = *years.first().unwrap();
-    let max_year = *years.last().unwrap();
-    let max_value = means
-        .iter()
-        .chain(medians.iter())
-        .chain(stds.iter())
-        .cloned()
-        .fold(0.0_f64, f64::max);
-
-    // Build chart
-    let mut chart = ChartBuilder::on(&root)
-        .caption("AAPL Close Price Statistics (2010-2021)", ("sans-serif", 40))
-        .margin(5)
-        .set_all_label_area_size(50)
-        .build_cartesian_2d(min_year..max_year, 0.0..max_value)?;
-
-    chart.configure_mesh().draw()?;
-
-    // Plot mean
-    chart.draw_series(LineSeries::new(
-        years.iter().zip(means.iter()).map(|(&x, &y)| (x, y)),
-        &RED,
-    ))?
-    .label("Mean")
-    .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 1, y)], &RED));
-
-    // Plot median
-    chart.draw_series(LineSeries::new(
-        years.iter().zip(medians.iter()).map(|(&x, &y)| (x, y)),
-        &BLUE,
-    ))?
-    .label("Median")
-    .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 1, y)], &BLUE));
-
-    // Plot standard deviation
-    chart.draw_series(LineSeries::new(
-        years.iter().zip(stds.iter()).map(|(&x, &y)| (x, y)),
-        &GREEN,
-    ))?
-    .label("Standard Deviation")
-    .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 1, y)], &GREEN));
-
-    // Configure the legend
-    chart
-        .configure_series_labels()
-        .background_style(&WHITE.mix(0.8))
-        .border_style(&BLACK)
-        .draw()?;
-
+// 从 CSV 文件加载数据并插入到数据库
+pub fn load_csv_to_db(conn: &Connection, csv_path: &str) -> Result<(), Box<dyn Error>> {
+    let mut rdr = ReaderBuilder::new().from_path(csv_path)?;
+    for result in rdr.deserialize() {
+        let record: StockRecord = result?;
+        conn.execute(
+            "INSERT INTO stock_data (date, open, high, low, close, adj_close, volume, name, year)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            &[
+                &record.date,
+                &record.open,
+                &record.high,
+                &record.low,
+                &record.close,
+                &record.adj_close,
+                &record.volume,
+                &record.name,
+                &record.year,
+            ],
+        )?;
+    }
     Ok(())
+}
+
+// 按照年份分组，计算均值、中位数和标准差
+pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT year,
+                AVG(close) AS mean,
+                MEDIAN(close) AS median,  -- SQLite 默认不支持 median，需要扩展支持
+                STDDEV(close) AS std      -- SQLite 默认不支持 std，需要扩展支持
+         FROM stock_data
+         GROUP BY year"
+    )?;
+    let results = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,  // year
+                row.get(1)?,  // mean
+                row.get(2)?,  // median
+                row.get(3)?,  // std
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(results)
 }
