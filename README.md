@@ -1,10 +1,9 @@
-![Install Dependencies](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/install.yml/badge.svg)
-![Format Code](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/format.yml/badge.svg)
-![Lint Code](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/lint.yml/badge.svg)
-![Run Tests](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/test.yml/badge.svg)
+![CI/CD Pipeline](https://github.com/haobo-yuan/IDS706-8-Rust-RewriteProject5/actions/workflows/main.yml/badge.svg)
 
 # IDS-706 Data Engineering: Project 8
-This is a IDS-706 week 8 project that tries to take an existing Python script (which interactes with SQL Database) for data processing and rewrite it in Rust.
+This is a IDS-706 Week 8 project that tries to take an existing Python script (which interactes with SQL Database) for data processing and rewrite it in Rust.
+
+This project provides a Rust-based solution for loading and analyzing Apple stock data from 2010 to 2021. The application reads data from a CSV file, stores it in a local SQLite database, and calculates annual statistics such as mean, median, and standard deviation for each year. This project demonstrates efficient data handling and analysis in Rust, using libraries like csv for parsing and rusqlite for database management.
 
 ## AAPL Price Statistics (2010-2021)
 
