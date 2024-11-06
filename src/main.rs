@@ -1,8 +1,9 @@
-// ChatGPT is used for reference
 use std::error::Error;
 use rusqlite::{Connection, Result};
 use csv::ReaderBuilder;
 use serde::Deserialize;
+
+use std::collections::HashMap;
 
 // 定义 `StockRecord` 并派生 `Deserialize`
 #[derive(Debug, Deserialize)]
@@ -63,29 +64,48 @@ pub fn load_csv_to_db(conn: &Connection, csv_path: &str) -> Result<(), Box<dyn E
 }
 
 // 按照年份分组，计算均值、中位数和标准差
-pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>> {
+pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
-        "SELECT year,
-                AVG(close) AS mean,
-                MEDIAN(close) AS median,  -- SQLite 默认不支持 median，需要扩展支持
-                STDDEV(close) AS std      -- SQLite 默认不支持 std，需要扩展支持
+        "SELECT year, close
          FROM stock_data
-         GROUP BY year"
+         ORDER BY year"
     )?;
-    let results = stmt
-        .query_map([], |row| {
-            Ok((
-                row.get(0)?,  // year
-                row.get(1)?,  // mean
-                row.get(2)?,  // median
-                row.get(3)?,  // std
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut rows = stmt.query([])?;
 
-    Ok(results)
+    let mut data: HashMap<i32, Vec<f64>> = HashMap::new();
+
+    while let Some(row) = rows.next()? {
+        let year: i32 = row.get(0)?;
+        let close: f64 = row.get(1)?;
+        data.entry(year).or_insert_with(Vec::new).push(close);
+    }
+
+    let mut stats = Vec::new();
+
+    for (year, closes) in data {
+        let mean = closes.iter().sum::<f64>() / closes.len() as f64;
+        let median = {
+            let mut sorted = closes.clone();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let mid = sorted.len() / 2;
+            if sorted.len() % 2 == 0 {
+                (sorted[mid - 1] + sorted[mid]) / 2.0
+            } else {
+                sorted[mid]
+            }
+        };
+        let std = {
+            let mean_diff_sq = closes.iter().map(|v| (v - mean).powi(2)).sum::<f64>();
+            (mean_diff_sq / closes.len() as f64).sqrt()
+        };
+        stats.push((year, mean, median, std));
+    }
+
+    // 按年份排序
+    stats.sort_by_key(|k| k.0);
+
+    Ok(stats)
 }
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     let db_path = "data/stock_AAPL.db";
