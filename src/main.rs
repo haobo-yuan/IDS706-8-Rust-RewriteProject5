@@ -2,10 +2,9 @@ use std::error::Error;
 use rusqlite::{Connection, Result};
 use csv::ReaderBuilder;
 use serde::Deserialize;
-
 use std::collections::HashMap;
 
-// 定义 `StockRecord` 并派生 `Deserialize`
+// Define `StockRecord` struct to represent each stock record; derive `Deserialize` for CSV parsing
 #[derive(Debug, Deserialize)]
 pub struct StockRecord {
     date: String,
@@ -19,7 +18,7 @@ pub struct StockRecord {
     year: i32,
 }
 
-// 创建数据库连接并初始化表
+// Initialize database connection and create the table if it doesn't exist
 pub fn init_db(db_path: &str) -> Result<Connection> {
     let conn = Connection::open(db_path)?;
     conn.execute(
@@ -39,7 +38,7 @@ pub fn init_db(db_path: &str) -> Result<Connection> {
     Ok(conn)
 }
 
-// 从 CSV 文件加载数据并插入到数据库
+// Load data from CSV file and insert records into the database
 pub fn load_csv_to_db(conn: &Connection, csv_path: &str) -> Result<(), Box<dyn Error>> {
     let mut rdr = ReaderBuilder::new().from_path(csv_path)?;
     for result in rdr.deserialize() {
@@ -63,7 +62,7 @@ pub fn load_csv_to_db(conn: &Connection, csv_path: &str) -> Result<(), Box<dyn E
     Ok(())
 }
 
-// 按照年份分组，计算均值、中位数和标准差
+// Calculate mean, median, and standard deviation of `close` prices grouped by year
 pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>, Box<dyn Error>> {
     let mut stmt = conn.prepare(
         "SELECT year, close
@@ -74,6 +73,7 @@ pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>, B
 
     let mut data: HashMap<i32, Vec<f64>> = HashMap::new();
 
+    // Group `close` prices by year
     while let Some(row) = rows.next()? {
         let year: i32 = row.get(0)?;
         let close: f64 = row.get(1)?;
@@ -83,7 +83,10 @@ pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>, B
     let mut stats = Vec::new();
 
     for (year, closes) in data {
+        // Calculate mean
         let mean = closes.iter().sum::<f64>() / closes.len() as f64;
+        
+        // Calculate median
         let median = {
             let mut sorted = closes.clone();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -94,14 +97,17 @@ pub fn calculate_stats(conn: &Connection) -> Result<Vec<(i32, f64, f64, f64)>, B
                 sorted[mid]
             }
         };
+
+        // Calculate standard deviation
         let std = {
             let mean_diff_sq = closes.iter().map(|v| (v - mean).powi(2)).sum::<f64>();
             (mean_diff_sq / closes.len() as f64).sqrt()
         };
+        
         stats.push((year, mean, median, std));
     }
 
-    // 按年份排序
+    // Sort statistics by year for output consistency
     stats.sort_by_key(|k| k.0);
 
     Ok(stats)
@@ -111,16 +117,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let db_path = "data/stock_AAPL.db";
     let csv_path = "data/stock_AAPL.csv";
 
-    // 初始化数据库
+    // Initialize the database
     let conn = init_db(db_path)?;
 
-    // 加载 CSV 数据到数据库
+    // Load CSV data into the database
     load_csv_to_db(&conn, csv_path)?;
 
-    // 计算每年的统计数据
+    // Calculate annual statistics
     let stats = calculate_stats(&conn)?;
 
-    // 输出表格
+    // Output statistics table
     println!("{:<6} {:<10} {:<10} {:<10}", "Year", "Mean", "Median", "Std");
     for (year, mean, median, std) in stats {
         println!("{:<6} {:<10.2} {:<10.2} {:<10.2}", year, mean, median, std);

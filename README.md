@@ -40,6 +40,8 @@ stock_AAPL.columns = ["date", "open", "high", "low", "close", "adj_close", "volu
 stock_AAPL.to_pandas().to_csv(os.path.join("data", "stock_AAPL.csv"), index=False)
 ```
 
+These scripts are also stored in `/src` folder of this project.
+
 ### Instructions to Run the Project
 
 1. Clone the repository to your local machine.
